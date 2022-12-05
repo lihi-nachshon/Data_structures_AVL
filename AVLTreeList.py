@@ -138,7 +138,8 @@ class AVLTreeList(object):
 	def __init__(self):
 		self.size = 0
 		self.root = None
-		self.min = None
+		self.first = None
+		self.last = None
 
 
 	"""returns whether the list is empty
@@ -177,14 +178,17 @@ class AVLTreeList(object):
 	def insert(self, i, val):
 		n = self.size
 
-		if 0 > i or i > n:
+		if 0 > i or i >= n:
 			return 0
 
 		new_node = AVLNode(val)
-		if i == n:
-			node_max = self.get_max()
+		if i == 0:
+			self.first = new_node
+		if i == n - 1:
+			node_max = self.last
 			node_max.setRight(new_node)
 			new_node.setParent(node_max)
+			self.last = new_node
 		else:
 			node_successor = self.Tree_select(i + 1)
 			if not node_successor.getLeft().isReal():
@@ -196,6 +200,7 @@ class AVLTreeList(object):
 				new_node.setParent(node_predecessor)
 
 		self.size += 1
+		self.update_fields_till_root(new_node)
 		cnt_rotations = self.insert_fix_tree(new_node)
 
 		return cnt_rotations
@@ -210,8 +215,73 @@ class AVLTreeList(object):
 	@returns: the number of rebalancing operation due to AVL rebalancing
 	"""
 	def delete(self, i):
-		return -1
+		n = self.size
 
+		if 0 > i or i >= n:
+			return -1
+
+		node = self.Tree_select(i + 1)
+
+		if i == 0:
+			self.first = node.getParent()
+		if i == n-1:
+			self.last = self.predecessor(node)
+
+		parent_of_deleted = node.getParent()
+		# if node is a leaf
+		if node.getLeft().isReal() == False and node.getRight().isReal() == False:
+			parent = node.getParent()
+			if parent.getLeft() == node:
+				parent.setLeft(AVLNode(None, False))
+			else:
+				parent.setRight(AVLNode(None, False))
+			node.setParent(None)
+		# if node has one child
+		elif node.getLeft().isReal() == False:
+			child = node.getRight()
+			parent = node.getParent()
+			child.setParent(parent)
+			if parent.getLeft() == node:
+				parent.setLeft(child)
+			else:
+				parent.setRight(child)
+			node.setParent(None)
+			node.setRight(None)
+
+		elif node.getRight().isReal() == False:
+			child = node.getLeft()
+			parent = node.getParent()
+			child.setParent(parent)
+			if parent.getLeft() == node:
+				parent.setLeft(child)
+			else:
+				parent.setRight(child)
+			node.setParent(None)
+			node.setLeft(None)
+		# if node has two children
+		else:
+			node_successor = self.successor(node)
+			parent_of_deleted = node_successor.getParent()
+			child = node_successor.getRight()
+			parent = node_successor.getParent()
+			child.setParent(parent)
+			if parent.getLeft() == node_successor:
+				parent.setLeft(child)
+			else:
+				parent.setRight(child)
+
+			node_successor.setRight(node.getRight())
+			node_successor.setLeft(node.getLeft())
+			node_successor.setParent(node.getParent())
+			node.setParent(None)
+			node.setLeft(None)
+			node.setRight(None)
+
+		self.size -= 1
+		self.update_fields_till_root(parent_of_deleted)
+		cnt_rotations = self.delete_fix_tree(parent_of_deleted)
+
+		return cnt_rotations
 
 	"""returns the value of the first item in the list
 
@@ -219,7 +289,9 @@ class AVLTreeList(object):
 	@returns: the value of the first item, None if the list is empty
 	"""
 	def first(self):
-		return None
+		if self.size == 0:
+			return None
+		return self.first
 
 	"""returns the value of the last item in the list
 
@@ -227,7 +299,9 @@ class AVLTreeList(object):
 	@returns: the value of the last item, None if the list is empty
 	"""
 	def last(self):
-		return None
+		if self.size == 0:
+			return None
+		return self.last
 
 	"""returns an array representing list 
 
@@ -235,7 +309,10 @@ class AVLTreeList(object):
 	@returns: a list of strings representing the data structure
 	"""
 	def listToArray(self):
-		return None
+		list = []
+		if self.size > 0:
+			self.in_order(list)
+		return list
 
 	"""returns the size of the list 
 
@@ -243,7 +320,7 @@ class AVLTreeList(object):
 	@returns: the size of the list
 	"""
 	def length(self):
-		return None
+		return self.size
 
 	"""sort the info values of the list
 
@@ -312,11 +389,25 @@ class AVLTreeList(object):
 			node = node.getRight()
 		return node
 
+	def get_min(self, node):
+		while(node.getLeft().isReal()):
+			node = node.getLeft()
+		return node
+
 	def predecessor(self, node):
 		if node.getLeft().isReal():
 			return self.get_max(node.getLeft())
 		par = node.getParent()
 		while(par.isReal() and node == par.getLeft()):
+			node = par
+			par = node.getParent()
+		return par
+
+	def successor(self, node):
+		if node.getRight().isReal():
+			return self.get_min(node.getRight())
+		par = node.getParent()
+		while(par.isReal() and node == par.getRight()):
 			node = par
 			par = node.getParent()
 		return par
@@ -391,7 +482,32 @@ class AVLTreeList(object):
 			BF = self.get_BF(y)
 			if abs(BF) < 2 and prev_height == y.getHeight():
 				break
-			elif abs(BF) and prev_height != y.getHeight():
+			elif abs(BF) < 2 and prev_height != y.getHeight():
+				y = y.getParent()
+				continue
+			else:
+				self.check_and_rotate(y)
+				cnt_rotations += 1
+				break
+
+		return cnt_rotations
+
+	def update_fields_till_root(self, node):
+		while(node.isReal()):
+			self.update_fields(node)
+			node = node.getParent()
+
+	# return the number of rotations
+	def delete_fix_tree(self, node):
+		cnt_rotations = 0
+		y = node
+		while (y.isReal()):
+			prev_height = y.getHeight()
+			self.update_fields(y)
+			BF = self.get_BF(y)
+			if abs(BF) < 2 and prev_height == y.getHeight():
+				break
+			elif abs(BF) < 2 and prev_height != y.getHeight():
 				y = y.getParent()
 				continue
 			else:
@@ -399,3 +515,12 @@ class AVLTreeList(object):
 				cnt_rotations += 1
 
 		return cnt_rotations
+
+	def in_order(self, list):
+		self.in_order_rec(list, self.root)
+
+	def in_order_rec(self, list, node):
+		if node.isReal():
+			self.in_order_rec(list, node.getLeft())
+			list.append(node.getValue())
+			self.in_order_rec(list, node.getRight())
