@@ -3,7 +3,7 @@
 #name1    - complete info
 #id2      - complete info
 #name2    - complete info  
-
+import random
 
 
 """A class represnting a node in an AVL tree"""
@@ -16,13 +16,13 @@ class AVLNode(object):
 	"""
 
 
-	def __init__(self, value, isReal=True):
+	def __init__(self, value, isReal=True, height = -1, size = 1):
 		self.value = value
 		self.left = AVLNode(None, False)
 		self.right = AVLNode(None, False)
 		self.parent = AVLNode(None, False)
-		self.height = -1 # Balance factor
-		self.size = 0
+		self.height = height # Balance factor
+		self.size = size
 		self.is_real = isReal
 
 	"""returns the left child
@@ -328,7 +328,9 @@ class AVLTreeList(object):
 	@returns: an AVLTreeList where the values are sorted by the info of the original list.
 	"""
 	def sort(self):
-		return None
+		arr = self.listToArray()
+		arr.sort()
+		return self.create_tree_from_sorted_array(arr)
 
 	"""permute the info values of the list 
 
@@ -336,7 +338,9 @@ class AVLTreeList(object):
 	@returns: an AVLTreeList where the values are permuted randomly by the info of the original list. ##Use Randomness
 	"""
 	def permutation(self):
-		return None
+		arr = self.listToArray()
+		random.shuffle(arr)
+		return self.create_tree_from_sorted_array(arr)
 
 	"""concatenates lst to self
 
@@ -346,7 +350,11 @@ class AVLTreeList(object):
 	@returns: the absolute value of the difference between the height of the AVL trees joined
 	"""
 	def concat(self, lst):
-		return None
+		if self.root.height >= lst.root.height:
+			self.right_concat(lst)
+		else:
+			self.left_concat(lst)
+		return abs(self.root.height - lst.root.height)
 
 	"""searches for a *value* in the list
 
@@ -356,7 +364,8 @@ class AVLTreeList(object):
 	@returns: the first index that contains val, -1 if not found.
 	"""
 	def search(self, val):
-		return None
+		arr = self.listToArray()
+		return arr.index(val)
 
 
 
@@ -524,3 +533,70 @@ class AVLTreeList(object):
 			self.in_order_rec(list, node.getLeft())
 			list.append(node.getValue())
 			self.in_order_rec(list, node.getRight())
+
+	def create_tree_from_sorted_array(self, arr):
+		root = self.create_tree_from_sorted_array_rec(arr)
+		tree = AVLTreeList()
+		tree.root = root
+		tree.size = len(arr)
+		tree.first = tree.get_min()
+		tree.last = tree.get_max()
+		return tree
+
+	def create_tree_from_sorted_array_rec(self, arr):
+		if len(arr) == 0:
+			return AVLNode(None, False)
+		if len(arr) == 1:
+			return AVLNode(arr[0], True, 0, 1)
+		mid = int((len(arr))/2)
+		parent = AVLNode(arr[mid])
+		left = arr[:mid]
+		right = arr[mid + 1:]
+		l_child = self.create_tree_from_sorted_array_rec(left)
+		r_child = self.create_tree_from_sorted_array_rec(right)
+		parent.setRight(r_child)
+		parent.setLeft(l_child)
+		l_child.setParent(parent)
+		r_child.setParent(parent)
+		self.update_fields(parent)
+		return parent
+
+	def left_concat(self, lst):
+		h1 = self.root.getHeight()
+		r_node = lst.root
+		while(r_node.getHeight() > h1):
+			r_node = r_node.getLeft()
+		l_node = self.root
+		x = AVLNode(None)
+		x_index = self.size + 1
+		self.join(l_node, x, r_node, "left")
+		self.root = lst.root
+		self.size = lst.size
+		self.last = lst.last
+		self.delete(x_index)
+
+	def right_concat(self, lst):
+		h2 = lst.root.getHeight()
+		l_node = self.root
+		while (l_node.getHeight() > h2):
+			l_node = l_node.getRight()
+		r_node = lst.root
+		x = AVLNode(None)
+		x_index = self.size + 1
+		self.join(r_node, x, l_node, "right")
+		self.first = lst.first
+		self.delete(x_index)
+
+	def join(self, a, x, b, dir):
+		x.setLeft(a)
+		x.setRight(b)
+		c = b.getParent()
+		a.setParent(x)
+		b.setParent(x)
+		x.setParent(c)
+		if dir == "left":
+			c.setLeft(x)
+		else:
+			c.setRight(x)
+		self.update_fields_till_root(x)
+		self.insert_fix_tree(c)
